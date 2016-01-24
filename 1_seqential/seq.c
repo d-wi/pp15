@@ -8,7 +8,8 @@
 
 void printUsage(void)
 {
-    fprintf( stdout, "Usage: seq -m<rows> -n<cols> -i<input-file> -o<output-file>");
+    fprintf( stdout, "Usage: seq -m <rows> -n <cols> -i <input-file> -o <output-file>\n");
+    exit(1);
 }
 
 int main (int argc, char* argv[])
@@ -16,7 +17,7 @@ int main (int argc, char* argv[])
     int c;
     int m, n;
     struct timespec tStart, tEnd;
-    uint64_t tDuration;
+    unsigned long int tDuration;
     int i, j;
     
     char* in;
@@ -35,10 +36,10 @@ int main (int argc, char* argv[])
     
     opterr = 0;
     
-/* input processing */
+/* parameter processing */
 
     /* argument check */
-    while( ( c = getopt( argc, argv, "mnio") ) )
+    while( ( c = getopt( argc, argv, "mnio") ) != -1 )
         switch( c )
         {
             case 'm':
@@ -54,7 +55,7 @@ int main (int argc, char* argv[])
                 out = optarg;
                 break;
             case '?':
-                if( optopt == 'c')
+                if( optopt == 'm' || optopt == 'n' || optopt == 'i' || optopt == 'o' )
                     fprintf( stderr, "Option -%c requires an argument.\n", optopt);
                 else if( isprint( optopt ) )
                     fprintf( stderr, "Unknown option `-%c´.\n", optopt );
@@ -62,10 +63,8 @@ int main (int argc, char* argv[])
                     fprintf( stderr, "Unknown option characer `\\x%x´.\n", optopt );
                 
                 printUsage();
-                exit( 1 );
             default:
                 printUsage();
-                exit( 1 );
         }
     
 /* computation */
@@ -78,14 +77,20 @@ int main (int argc, char* argv[])
     
     if( fpIn == NULL )
     {
-        fprintf( stderr, "Could not open input-file!");
+        fprintf( stderr, "Could not open input-file '%s'!\n", in);
         exit( 1 );
     }
     
     for (i = 0; i < m; ++i) {
         for (j = 0; i < n; ++j) {
-            fscanf( fpIn, "%f;", &A[i*n + j]);
+            if( fscanf( fpIn, "%f;", &A[i*n + j] ) == 0 )
+            {
+                fprintf( stderr, "Error: input does not match expected format!\n" );
+                exit ( 1 );
+            }
+            fprintf( stdout, "%f, ", A[i*n + j] ); // print items of row
         }
+        fprintf( stdout, "\n" ); // newline at the end of row
     }
     
     fclose( fpIn );
@@ -96,14 +101,14 @@ int main (int argc, char* argv[])
     
     for (i = 0; i < m; ++i) {
         for (j = 0; i < n; ++j) {
-            fprintf( stdout, "%f,", A[i*n + j] );
+            fprintf( stdout, "%f, ", A[i*n + j] );
         }
-        fprintf( stdout, "\n" );
+        fprintf( stdout, "\n" ); // newline at the end of row
     }
     
     clock_gettime( CLOCK_MONOTONIC, &tEnd );
     
-    tDuration = ( tEnd.tv_sec - tStart.tv_sec ) * SECONDS_TO_NANOSECONDS + ( tEnd.tv_sec - tStart.tv_sec ) ;
+    tDuration = ( tEnd.tv_sec - tStart.tv_sec ) * SECONDS_TO_NANOSECONDS + ( tEnd.tv_nsec - tStart.tv_nsec ) ;
 
-    fprintf( stdout, "%d x %d - Matrix processed in %llu ns", m, n, tDuration );
+    fprintf( stdout, "%d x %d - Matrix processed in %lu ns", m, n, tDuration );
 }
