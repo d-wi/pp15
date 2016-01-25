@@ -8,41 +8,32 @@
 
 void printUsage(void)
 {
-    fprintf( stdout, "Usage: seq -m<rows> -n<cols> -i<input-file> -o<output-file>\n");
-	exit(1);
+    fprintf( stdout, "Usage: seq -m <rows> -n <cols> -i <input-file> -o <output-file>\n");
+    exit( 1 );
 }
 
 int main (int argc, char* argv[])
 {
-    int c;
-    int m, n;
+    int c;      // option character
+    int i, j;   // matrix loop variables
+    int m, n;   // matrix dimensions
+
     struct timespec tStart, tEnd;
     unsigned long int tDuration;
-    int i, j;
-	int index;
-    
+
     char* in;
     char* out;
-    
+
     FILE *fpIn = NULL;
     FILE *fpOut = NULL;
 
-	fprintf( stdout, "start\n" );
+/* parameter processing */
 
-	fflush( stdout );
-    
-    /* Input matrix is m x n, with first and last columns and rows containing boundary-values.
-     * To operate only on a single matrix the output will be stored from 0,0 to (m-2),(n-2) leaving
-     * the last 2 rows and columns unchanged.
-     * m and n are both expected to be of power of 2 plus 2 to make the output matrix dimensions and
-     * therfore the rows and columns which have to be computed are of power of two.
-     */
-    
-    opterr = 0;
-    
-/* input processing */
+    fprintf( stdout, "checking paramters ...\n" );
 
     /* argument check */
+    opterr = 0;
+
     while( ( c = getopt( argc, argv, "m:n:i:o:") ) != -1 )
         switch( c )
         {
@@ -59,75 +50,143 @@ int main (int argc, char* argv[])
                 out = optarg;
                 break;
             case '?':
-                if( optopt == 'm' || optopt == 'n' || optopt == 'i' || optopt == 'o')
-                    fprintf( stderr, "Option -%c requires an argument.\n", optopt);
+                if( optopt == 'm' || optopt == 'n' || optopt == 'i' || optopt == 'o' )
+                    fprintf( stderr, "Option -%c requires an argument.\n", optopt );
                 else if( isprint( optopt ) )
                     fprintf( stderr, "Unknown option `-%c´.\n", optopt );
                 else
                     fprintf( stderr, "Unknown option characer `\\x%x´.\n", optopt );
-
                 printUsage();
             default:
                 printUsage();
         }
-/*
-	int abort = 0;
-	for( index = optind; index < argc; index++)
-    	{
-		printf("Non-option argument %s\n", argv[index] );
-		abort = 1;
-	}
-	if( abort == 0 )
-		printUsage();
-*/
 
-	fprintf( stdout, "computing ...\n");
+    fprintf( stdout, "Values: m=%d, n=%d, in=%s, out=%s\n", m, n, in, out );
+    fflush( stdout );
 
-	fflush( stdout );
 
-    float *A = malloc( sizeof( float ) * m * n );
+    int tmp = (m-2);
 
-    
-/* computation */
-    
-    clock_gettime( CLOCK_REALTIME, &tStart );
-
-	fprintf( stdout, "Input:%s\n", in );
-    
-    /* get input values */
-    
-    fpIn = fopen( in, "r" );
-
-	fprintf( stdout, "2\n" );
-
-	fflush( stdout );
-    
-    if( fpIn == NULL )
+    /* value check - m,n = 2^x+2 */
+    if( !((tmp > 0) && ((tmp & (tmp - 1)) == 0)))
     {
-        fprintf( stderr, "Could not open input-file!\n");
+        fprintf( stderr, "Input-error: m has to be of power of 2 plus 2 (e.g. 6, 10, 18) but is '%d' instead! (tmp=%d)\n", m, tmp );
         exit( 1 );
     }
-    
-    for (i = 0; i < m; ++i) {
-        for (j = 0; j < n; ++j) {
-            fscanf( fpIn, "%f;", &A[i*n + j] );
-            fprintf( stdout, "%f,", A[i*n + j] );
-        }
-        fprintf( stdout, "\n" );
+
+    tmp = (n-2);
+
+    if( !((tmp > 0) && ((tmp & (tmp - 1)) == 0)))
+    {
+        fprintf( stderr, "Input-error: n has to be of power of 2 plus 2 (e.g. 6, 10, 18) but is '%d' instead!\n", n );
+        exit( 1 );
     }
 
-	fprintf( stdout, "3\n");
-    
+    /* Input matrix is m x n, with first and last columns and rows containing boundary-values.
+     * To operate only on a single matrix the output will be stored from 0,0 to (m-2),(n-2) leaving
+     * the last 2 rows and columns unchanged.
+     * m and n are both expected to be of power of 2 plus 2 to make the output matrix dimensions and
+     * therfore the rows and columns which have to be computed are of power of two.
+     */
+
+    /*       0   1   2   3  ...  n
+     *     -------------------------
+     *   0 | x | b | b | b |...| x |
+     *     +---+---+---+---+---+---+
+     *   1 | b |   |   |   |...| b |
+     *     +---+---+---+---+---+---+
+     *   2 | b |   |   |   |...| b |
+     *     +---+---+---+---+---+---+
+     *   3 | b |   |   |   |...| b |
+     *     +---+---+---+---+---+---+
+     * ... |...|...|...|...|...|...|    x ... ignored values
+     *     +---+---+---+---+---+---+    b ... boundary values
+     *   m | x | b | b | b |...| x |
+     *     +---+---+---+---+---+---+
+     */
+    float *A = malloc( sizeof( float ) * m * n );
+
+/* computation */
+
+    fprintf( stdout, "reading input\n" );
+
+    clock_gettime( CLOCK_MONOTONIC, &tStart );
+
+    /* open file */
+    fpIn = fopen( in, "r" );
+
+    if( fpIn == NULL )
+    {
+        fprintf( stderr, "Could not open input-file '%s'!\n", in );
+        exit( 1 );
+    }
+
+    /* read values */
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++) {
+            if( fscanf( fpIn, "%f;", &A[i*n + j] ) == 0 )
+            {
+                fprintf( stderr, "Error: input does not match expected format!\n" );
+                exit ( 1 );
+            }
+            fprintf( stdout, "%f, ", A[i*n + j] ); // print items of row
+        }
+        fprintf( stdout, "\n" ); // newline at the end of row
+    }
+
     fclose( fpIn );
-    
+
+    fprintf( stdout, "processing values ...\n" );
+
     /* process values */
-    
-    /* output */
-    
-    
-    clock_gettime( CLOCK_REALTIME, &tEnd );
-    
+    for( i = 1; i < (m - 1); i++)
+    {
+        for( j = 1; j < (n - 1); j++)
+        {
+            // 4-point stencil
+
+            /*          <--------------------
+             *             |          |
+             *    <NEWVAL> | (i-1), j |
+             * A           |          |
+             * | --------------------------------
+             * |           |          |
+             * |  i, (j-1) |    i,  j | i, (j+1)
+             * |           |          |
+             * | --------------------------------
+             *             |          |
+             * |           | (i+1), j |
+             *             |          |
+             */
+            A[ (i-1) * n + (j-1) ] = 0.25 * ( A[ (i-1)*n + j] + A[ i*n + (j-1) ] + A[ i*n + (j+1) ] + A[ (i+1)*n + j] );
+        }
+    }
+
+/* output */
+
+    fprintf( stdout, "writing results back ...\n" );
+
+    /* open file */
+    fpOut = fopen( out, "w" );
+
+    if( fpOut == NULL )
+    {
+        fprintf( stderr, "Could not write to output-file '%s'!\n", out );
+        exit( 1 );
+    }
+
+    for (i = 0; i < (m-2); i++) {
+        for (j = 0; j < (n-2); j++) {
+            fprintf( fpOut, "%f, ", A[i*n + j] );
+        }
+        fprintf( fpOut, "\n" ); // newline at the end of row
+    }
+
+    clock_gettime( CLOCK_MONOTONIC, &tEnd );
+
     tDuration = ( tEnd.tv_sec - tStart.tv_sec ) * SECONDS_TO_NANOSECONDS + ( tEnd.tv_nsec - tStart.tv_nsec ) ;
 
-    fprintf( stdout, "%d x %d - Matrix processed in %lu ns (%lu - %lu)\n", m, n, tDuration, tStart.tv_nsec, tEnd.tv_nsec );
+    fprintf( stdout, "%d x %d - Matrix processed in %lu ns", m, n, tDuration );
+
+    return( 0 );
 }
