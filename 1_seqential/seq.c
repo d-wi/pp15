@@ -26,6 +26,7 @@ int main (int argc, char* argv[])
 
     FILE *fpIn = NULL;
     FILE *fpOut = NULL;
+    FILE *fpMeas = NULL;
 
 /* parameter processing */
 
@@ -182,11 +183,24 @@ int main (int argc, char* argv[])
         fprintf( fpOut, "\n" ); // newline at the end of row
     }
 
+    fclose( fpOut );
+
     clock_gettime( CLOCK_MONOTONIC, &tEnd );
 
     tDuration = ( tEnd.tv_sec - tStart.tv_sec ) * SECONDS_TO_NANOSECONDS + ( tEnd.tv_nsec - tStart.tv_nsec ) ;
 
-    fprintf( stdout, "%d x %d - Matrix processed in %lu ns", m, n, tDuration );
+    fprintf( stdout, "%d x %d - Matrix processed in %lu ns\n", m, n, tDuration );
+
+/* reporting measurement to file */
+
+    char measFile[255];
+    snprintf( measFile, 255, "../output/%s_%d_%d.txt", argv[0], m, n );
+
+    fpMeas = fopen( measFile, "a" );
+
+    fprintf( fpMeas, "%lu\n", tDuration );
+
+    fclose( fpMeas );
 
     return( 0 );
 }
