@@ -130,9 +130,9 @@ int main (int argc, char* argv[])
                 fprintf( stderr, "Error: input does not match expected format!\n" );
                 exit ( 1 );
             }
-            fprintf( stdout, "%f, ", A[i*n + j] ); // print items of row
+            // fprintf( stdout, "%f, ", A[i*n + j] ); // print items of row
         }
-        fprintf( stdout, "\n" ); // newline at the end of row
+        // fprintf( stdout, "\n" ); // newline at the end of row
     }
 
     fclose( fpIn );
