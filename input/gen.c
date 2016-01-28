@@ -87,7 +87,7 @@ int main (int argc, char* argv[])
     
     for (i = 0; i < m; i++) {
         for (j = 0; j < n; j++) {
-            fprintf( fpOut, "%f;", (float) (m+n) );
+            fprintf( fpOut, "%.2f;", (float) (i+j) );
         }
         fprintf( fpOut, "\n" ); // newline at the end of row
     }
