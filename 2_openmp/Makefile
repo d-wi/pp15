@@ -10,7 +10,7 @@ openmpTest: openmpTest.c
 	gcc -o openmpTest -fopenmp openmpTest.c
 
 openmp: openmp.c
-	gcc -o openmp -fopenmp openmp.c
+	gcc $(CFLAGS) -o openmp -fopenmp openmp.c
 
 clean:
 	rm -f openmp openmpTest openmpPi
