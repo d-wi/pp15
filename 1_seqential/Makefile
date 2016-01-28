@@ -4,7 +4,7 @@ CFLAGS=-Wall
 all: seq
 
 seq: seq.c
-	gcc -o seq seq.c -lrt
+	gcc $(CFLAGS) -o seq seq.c -lrt
 
 8x8: 10x10
 10x10: seq
