@@ -20,8 +20,8 @@ int main (int argc, char* argv[])
     int m, n;   // matrix dimensions
     int p;      // core count
     
-    struct timespec tStart, tEnd;
-    unsigned long int tDuration;
+    double tStart, tEnd;
+    double tDuration;
     
     char* in;
     char* out;
@@ -131,7 +131,7 @@ int main (int argc, char* argv[])
     
     omp_set_num_threads( p );
     
-    tstart = omp_get_wtime();
+    tStart = omp_get_wtime();
     
     /* open file */
     fpIn = fopen( in, "r" );
@@ -158,16 +158,56 @@ int main (int argc, char* argv[])
     fclose( fpIn );
     
     fprintf( stdout, "processing values ...\n" );
+
+    float *prevBound = malloc( sizeof( float ) * n);
+    float *lastRowOfBlock = malloc( sizeof(float) * n);
+    float *nextBound = malloc( sizeof( float ) * n);
+
+    int id;
+    int tmax;
+    int size;
+    long offset;
     
     /* process values */
-    #pragma omp parallel for default(private) shared(A) private(i,j) schedule(static)
-    for( j = 1; j < (n - 1); j++)
+    #pragma omp parallel shared(A) private( id, tmax, size, offset, i, j, prevBound, lastRowOfBlock, nextBound) schedule(static, (m-2)/p ) 
     {
-        for( i = 1; i < (m - 1); i++)
+	id = omp_get_thread_num();
+	tmax = omp_get_num_threads();
+
+        size = (m-2) / tmax;
+
+	offset = id * size * n;
+
+        /* copy boundary values */
+	memcpy( prevBound, A + ( sizeof(float) * (offset - n) ), sizeof( float ) * n );
+	memcpy( lastRowRowOfBlock, A + ( sizeof(float) * ( offset + (size - 1) * n ) ), sizeof( float ) * n );
+	memcpy( nextBound, A + ( sizeof(float) * (offset + size * n ) ), sizeof( float ) * n );
+
+        /* synchronize - all threads must have their local copy of bondaries ready for computation */
+	#pragma omp barrier
+
+	if( size == 1)
         {
-            // 4-point stencil
+	    for( j = 1; j < (n - 1); j++)
+            {
+                A[ offset + j-1 ] = 0.25 * ( prevBound[ j ] + lastRowOfBlock[ j-1 ] + lastRowOfBlock[ j+1 ] + nextBound[ j ] );
+	    }
+        }
+	else
+        {
+            /* bondary-values to previous block */
+            for( j = 1; j < (n - 1); j++)
+	    {
+                A[ offset + j-1 ] = 0.25 * ( prevBound[ j ] + A[ offset + n + (j-1)] + A[ offset + n + (j+1) ] + A[ offset + 2*n + j] );
+	    }
+
+            for( i = 1; i < (size - 2); i++)
+            {
+                for( j = 1; j < (n - 1); j++)
+                {
+	    // 4-point stencil
             
-            /*          <--------------------
+        	    /*          <--------------------
              *             |          |
              *    <NEWVAL> | (i-1), j |
              * A           |          |
@@ -176,11 +216,18 @@ int main (int argc, char* argv[])
              * |  i, (j-1) |    i,  j | i, (j+1)
              * |           |          |
              * | --------------------------------
-             *             |          |
-             * |           | (i+1), j |
+             * |           |          |
+             *             | (i+1), j |
              *             |          |
              */
-            A[ (i-1) * n + (j-1) ] = 0.25 * ( A[ (i-1)*n + j] + A[ i*n + (j-1) ] + A[ i*n + (j+1) ] + A[ (i+1)*n + j] );
+                     A[ offset + n*i + (j-1) ] = 0.25 * ( A[ offset + n*i + j] + A[ offset + n*(i+1) + (j-1) ] + A[ offset + n*(n+1) + (j+1) ] + A[ offset + n*(n+2) + j] );
+                }
+            }
+
+            for( j = 1; j < (n - 1); j++)
+            {
+                A[ offset + (size-1) * n + (j-1) ] = 0.25 * ( A[ offset + (size-1) * n + j ] + A[ offset + size*n + (j-1) ] + A[ offset + size*n + (j+1) ] + nextBound[ j ] );
+            }
         }
     }
     
@@ -206,11 +253,11 @@ int main (int argc, char* argv[])
     
     fclose( fpOut );
     
-    clock_gettime( CLOCK_MONOTONIC, &tEnd );
+    tEnd = omp_get_wtime();
     
-    tDuration = ( tEnd.tv_sec - tStart.tv_sec ) * SECONDS_TO_NANOSECONDS + ( tEnd.tv_nsec - tStart.tv_nsec ) ;
+    tDuration = ( tEnd - tStart );
     
-    fprintf( stdout, "%d x %d - Matrix processed in %lu ns\n", m, n, tDuration );
+    fprintf( stdout, "%d x %d - Matrix processed in %f s\n", m, n, tDuration );
     
     /* reporting measurement to file */
     
@@ -219,7 +266,7 @@ int main (int argc, char* argv[])
     
     fpMeas = fopen( measFile, "a" );
     
-    fprintf( fpMeas, "%lu\n", tDuration );
+    fprintf( fpMeas, "%f\n", tDuration );
     
     fclose( fpMeas );
     
